@@ -1,7 +1,7 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use mangadex_api::MangaDexClient;
-use mangadex_api_schema_rust::{v5::MangaAttributes, ApiObject};
+use mangadex_api_schema_rust::v5::RelatedAttributes;
 use mangadex_api_types_rust::{Language, MangaFeedSortOrder, OrderDirection};
 use std::{ops::RangeBounds, path::PathBuf, str::FromStr};
 use uuid::Uuid;
@@ -17,18 +17,10 @@ pub struct Manga {
     id: Uuid,
     client: MangaDexClient,
     title: Option<String>,
-    author: Option<String>,
+    authors: Vec<String>,
     chapters: Vec<Chapter>,
     covers: Vec<Cover>,
     path: Option<PathBuf>,
-}
-
-impl<T> TryFrom<ApiObject<MangaAttributes, T>> for Manga {
-    type Error = anyhow::Error;
-
-    fn try_from(value: ApiObject<MangaAttributes, T>) -> Result<Self, Self::Error> {
-        todo!()
-    }
 }
 
 impl Manga {
@@ -37,7 +29,7 @@ impl Manga {
             id,
             client: MangaDexClient::default(),
             title: None,
-            author: None,
+            authors: Vec::new(),
             chapters: Vec::new(),
             covers: Vec::new(),
             path: None,
@@ -60,8 +52,40 @@ impl Manga {
         todo!()
     }
 
-    pub async fn get_metadata(&self, pb: &ProgressBar) -> anyhow::Result<()> {
-        todo!();
+    pub async fn get_metadata(&mut self, pb: &ProgressBar) -> anyhow::Result<()> {
+        let manga_data = self
+            .client
+            .manga()
+            .get()
+            .manga_id(&self.id)
+            .build()?
+            .send()
+            .await?;
+
+        self.title = manga_data
+            .data
+            .attributes
+            .title
+            .get(&Language::English)
+            .or_else(|| {
+                manga_data
+                    .data
+                    .attributes
+                    .title
+                    .get(&Language::JapaneseRomanized)
+            })
+            .cloned();
+
+        self.authors = manga_data
+            .data
+            .relationships
+            .into_iter()
+            .filter_map(|rel| match rel.attributes {
+                Some(RelatedAttributes::Author(data)) => Some(data.name),
+                _ => None,
+            })
+            .collect();
+        Ok(())
     }
 
     pub async fn get_chapters(
@@ -103,10 +127,12 @@ impl Manga {
             offset += MAX_LIMIT;
         }
 
-        // Chapters should be sorted because we called the api with an order
-        // we can use this fact to remove duplicate chapters (from different scan groups)
-        // because they *should* be consecutive.
-        // This will need testing to confirm this is working as expected
+        // TODO Make chapters unique over chapter and sub_chapter
+        // Chapters should be sorted because we called the api with an order we
+        // can use this fact to remove duplicate chapters (from different scan
+        // groups) because they *should* be consecutive.
+        // This should allow us to use a cheaper local vector unique
+        // chapters.dedup();
         pb.finish_with_message(format!("Grabbed {} chapters.", chapters.len()));
         Ok(chapters)
     }
