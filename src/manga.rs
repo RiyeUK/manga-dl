@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use mangadex_api::MangaDexClient;
 use mangadex_api_schema_rust::v5::RelatedAttributes;
-use mangadex_api_types_rust::{Language, MangaFeedSortOrder, OrderDirection};
+use mangadex_api_types_rust::{
+    Language, MangaFeedSortOrder, OrderDirection, ReferenceExpansionResource,
+};
 use std::{ops::RangeBounds, path::PathBuf, str::FromStr};
 use uuid::Uuid;
 
@@ -14,13 +16,13 @@ use cover::Cover;
 
 #[derive(Debug)]
 pub struct Manga {
-    id: Uuid,
-    client: MangaDexClient,
-    title: Option<String>,
-    authors: Vec<String>,
-    chapters: Vec<Chapter>,
-    covers: Vec<Cover>,
-    path: Option<PathBuf>,
+    pub id: Uuid,
+    pub client: MangaDexClient,
+    pub title: Option<String>,
+    pub authors: Vec<String>,
+    pub chapters: Vec<Chapter>,
+    pub covers: Vec<Cover>,
+    pub path: Option<PathBuf>,
 }
 
 impl Manga {
@@ -40,28 +42,25 @@ impl Manga {
         Ok(Manga::new(Uuid::from_str(&uuid_str)?))
     }
 
-    pub async fn get_covers(
-        &self,
-        cover_language: Language,
-        pb: &ProgressBar,
-    ) -> Result<Vec<Cover>> {
+    pub async fn get_covers(&mut self, cover_language: Language) -> Result<()> {
         // let cover_data = self
         //     .client
         //     .cover()
         //     .add_manga_id()
-        todo!()
+        Ok(())
     }
 
-    pub async fn get_metadata(&mut self, pb: &ProgressBar) -> anyhow::Result<()> {
+    pub async fn get_metadata(&mut self) -> anyhow::Result<()> {
         let manga_data = self
             .client
             .manga()
             .get()
+            .includes(vec![ReferenceExpansionResource::Author])
             .manga_id(&self.id)
             .build()?
             .send()
             .await?;
-
+        dbg!(manga_data.clone());
         self.title = manga_data
             .data
             .attributes
@@ -88,11 +87,7 @@ impl Manga {
         Ok(())
     }
 
-    pub async fn get_chapters(
-        &self,
-        translated_language: Language,
-        pb: &ProgressBar,
-    ) -> Result<Vec<Chapter>> {
+    pub async fn get_chapters(&mut self, translated_language: Language) -> Result<()> {
         const MAX_LIMIT: u32 = 500; // This is the max that mangadex allows
         let mut offset = 0;
         let mut chapters = Vec::<Chapter>::new();
@@ -111,7 +106,7 @@ impl Manga {
                 .await??;
 
             // Update the length of the bar with the number of times we need to paginate
-            pb.set_length((chapter_data.total / chapter_data.limit) as u64 + 1);
+            // pb.set_length((chapter_data.total / chapter_data.limit) as u64 + 1);
 
             for chapter in chapter_data.data {
                 chapters.push(chapter.try_into()?);
@@ -120,8 +115,6 @@ impl Manga {
             if chapter_data.limit + chapter_data.offset > chapter_data.total {
                 break;
             }
-
-            pb.inc(1);
 
             // Update the offset and paginate
             offset += MAX_LIMIT;
@@ -133,8 +126,10 @@ impl Manga {
         // groups) because they *should* be consecutive.
         // This should allow us to use a cheaper local vector unique
         // chapters.dedup();
-        pb.finish_with_message(format!("Grabbed {} chapters.", chapters.len()));
-        Ok(chapters)
+
+        // pb.finish_with_message(format!("Grabbed {} chapters.", chapters.len()));
+        self.chapters = chapters;
+        Ok(())
     }
 
     pub fn volumes(&mut self, volumes: &impl RangeBounds<u32>) -> &mut Self {
@@ -153,6 +148,8 @@ impl Manga {
     }
 
     pub async fn download(&mut self) -> Result<()> {
-        todo!()
+        println!("START DOWNLOAD!");
+        Ok(())
+        // todo!()
     }
 }

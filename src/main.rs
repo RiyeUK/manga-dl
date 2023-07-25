@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api_types_rust::Language;
 use std::{ops::RangeBounds, str::FromStr, sync::Arc};
-use tokio::join;
+// use tokio::join;
 use uuid::Uuid;
 
 mod manga;
@@ -30,6 +30,12 @@ impl<R: RangeBounds<u32>> MangaBuilder<R> {
         }
     }
 
+    fn chapters(&mut self, chapters: R, language: Language) -> &mut Self {
+        self.chapters = Some(chapters);
+        self.translated_language = Some(language);
+        self
+    }
+
     fn volumes(&mut self, volumes: R, language: Language) -> &mut Self {
         self.volumes = Some(volumes);
         self.translated_language = Some(language);
@@ -48,72 +54,52 @@ impl<R: RangeBounds<u32>> MangaBuilder<R> {
     }
 
     async fn build(&mut self) -> Result<Manga> {
-        // Create a multi-progress bar
-        let multi_pb = MultiProgress::new();
-
-        // Create Progress bars, we will update with a new length if required
-        let metadata_pb = multi_pb.add(ProgressBar::new(1));
-        let chapters_pb = multi_pb.add(ProgressBar::new(1));
-        let covers_pb = multi_pb.add(ProgressBar::new(1));
-
         let style = ProgressStyle::with_template("{bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")?;
+        let mut manga = Manga::new(self.id.context("Missing Manga ID")?);
+        println!("Retrieving Metadata...");
 
-        metadata_pb.set_style(style.clone());
-        chapters_pb.set_style(style.clone());
-        covers_pb.set_style(style.clone());
+        manga.get_metadata().await?;
 
-        let manga_arc = Arc::new(Manga::new(self.id.context("Missing Manga ID")?));
-
-        let metadata_task = tokio::spawn({
-            let manga = manga_arc.clone();
-            async move {
-                manga.get_metadata(&metadata_pb).await?;
-                anyhow::Ok(())
+        println!("Success!");
+        println!(
+            "  Title: {}",
+            manga.title.as_ref().unwrap_or(&"None".to_string())
+        );
+        println!("  Authors: {}", {
+            if manga.authors.is_empty() {
+                "Unknown".to_string()
+            } else {
+                manga.authors.join(", ").to_string()
             }
         });
 
-        // We need to split these out so they can go to different threads
-        let translated_language = self.translated_language.unwrap_or(Language::English);
-        let cover_language = self.cover_langauge.unwrap_or(Language::Japanese);
+        if self.download_covers {
+            println!("Retrieving covers...");
+            manga
+                .get_covers(self.cover_langauge.unwrap_or(Language::Japanese))
+                .await?;
+        } else {
+            println!("Skipping covers...");
+        }
+        println!("Retrieving Chapter Metadata...");
+        manga
+            .get_chapters(self.translated_language.unwrap_or(Language::English))
+            .await?;
+        let chapters_length = manga.chapters.len();
+        println!("Recieved {} chapters.", manga.chapters.len());
 
-        let chapters_task = tokio::spawn({
-            let manga_arc = manga_arc.clone();
-            async move {
-                manga_arc
-                    .get_chapters(translated_language, &chapters_pb)
-                    .await?;
-                anyhow::Ok(())
-            }
-        });
-
-        let covers_task = tokio::spawn({
-            let manga = manga_arc.clone();
-            async move {
-                manga
-                    .get_covers(cover_language, &covers_pb)
-                    .await?;
-                anyhow::Ok(())
-            }
-        });
-
-        // Await the completion of all tasks
-        let (metadata_result, chapters_result, covers_result) =
-            join!(metadata_task, chapters_task, covers_task);
-
-        // Handle errors from each task (optional, based on your requirements)
-        metadata_result??;
-        chapters_result??;
-        covers_result??;
-
-        let mut manga = Arc::try_unwrap(manga_arc).expect("Unable to unwrap ARC");
-
-        // Wait for all progress bars to finish and print the summary
-        if let Some(volumes) = &self.volumes {
+        // Chapters are more spesific than volumes
+        // Maybe we should assert that both aren't set? As currently this isn't
+        // clear what is happening.
+        if let Some(chapters) = &self.chapters {
+            manga.chapters(chapters);
+        } else if let Some(volumes) = &self.volumes {
             manga.volumes(volumes);
         }
 
-        if let Some(chapters) = &self.chapters {
-            manga.chapters(chapters);
+        // Only print if the number changed
+        if chapters_length != manga.chapters.len() {
+            println!("Trimmed down to {} chapters.", manga.chapters.len());
         }
 
         Ok(manga)
@@ -126,7 +112,8 @@ async fn main() -> Result<()> {
         // .anilist_id()
         // .search("Manga Title")
         .manga_id(Uuid::from_str("643561e6-5c27-4382-95d3-8e84894a3fb6")?)
-        .volumes(0.., Language::English)
+        // .volumes(0.., Language::English)
+        .chapters(0.., Language::English)
         .covers(Language::Japanese)
         .build()
         .await?
