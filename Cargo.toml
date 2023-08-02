@@ -1,7 +1,12 @@
 [package]
 name = "manga-dl"
 version = "0.1.0"
+authors = ["George \"Riye\" Hollister"]
+description = "A tool to download mangas from mangadex to be used for conversion to epub."
+readme = "readme.md"
+repository = "https://github.com/RiyeUK/manga-dl/"
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
