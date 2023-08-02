@@ -13,4 +13,4 @@ This WIP Rust project downloads manga from mangadex in full quality. In a folder
 * Using Anilist.co Manga Reading list
 * Better error handling
 * Retry Logic
-* Clang cli
+* Clap cli
