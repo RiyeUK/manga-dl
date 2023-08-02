@@ -8,7 +8,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 console = { version = "0.15.7", features = ["windows-console-colors"] }
+derive_builder = "0.12.0"
 futures = "0.3.28"
+futures-util = "0.3.28"
 indicatif = "0.17.5"
 itertools = "0.11.0"
 mangadex-api = { version = "2.2.1", features = ["multi-thread"] }

@@ -1,155 +1,49 @@
+#[allow(unused_imports)]
 use anyhow::{Context, Result};
-use indicatif::{ProgressBar, ProgressStyle};
+#[allow(unused_imports)]
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api::MangaDexClient;
-use mangadex_api_schema_rust::v5::RelatedAttributes;
-use mangadex_api_types_rust::{
-    Language, MangaFeedSortOrder, OrderDirection, ReferenceExpansionResource,
-};
-use std::{ops::RangeBounds, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 use uuid::Uuid;
+
+pub mod get;
 
 mod chapter;
 mod cover;
+mod mangadata;
+mod volume;
 
-use chapter::Chapter;
-use cover::Cover;
+use mangadata::MangaData;
+use volume::Volume;
 
 #[derive(Debug)]
 pub struct Manga {
-    pub id: Uuid,
     pub client: MangaDexClient,
-    pub title: Option<String>,
-    pub authors: Vec<String>,
-    pub chapters: Vec<Chapter>,
-    pub covers: Vec<Cover>,
-    pub path: Option<PathBuf>,
+    pub id: Uuid,
+    pub metadata: MangaData,
+    pub volumes: Vec<Volume>,
+    pub path: PathBuf,
 }
 
 impl Manga {
-    pub fn new(id: Uuid) -> Self {
-        Self {
-            id,
-            client: MangaDexClient::default(),
-            title: None,
-            authors: Vec::new(),
-            chapters: Vec::new(),
-            covers: Vec::new(),
-            path: None,
-        }
-    }
-
-    pub fn from_str(uuid_str: &str) -> anyhow::Result<Manga> {
-        Ok(Manga::new(Uuid::from_str(&uuid_str)?))
-    }
-
-    pub async fn get_covers(&mut self, cover_language: Language) -> Result<()> {
-        // let cover_data = self
-        //     .client
-        //     .cover()
-        //     .add_manga_id()
-        Ok(())
-    }
-
-    pub async fn get_metadata(&mut self) -> anyhow::Result<()> {
-        let manga_data = self
-            .client
-            .manga()
-            .get()
-            .includes(vec![ReferenceExpansionResource::Author])
-            .manga_id(&self.id)
-            .build()?
-            .send()
-            .await?;
-        dbg!(manga_data.clone());
-        self.title = manga_data
-            .data
-            .attributes
-            .title
-            .get(&Language::English)
-            .or_else(|| {
-                manga_data
-                    .data
-                    .attributes
-                    .title
-                    .get(&Language::JapaneseRomanized)
-            })
-            .cloned();
-
-        self.authors = manga_data
-            .data
-            .relationships
-            .into_iter()
-            .filter_map(|rel| match rel.attributes {
-                Some(RelatedAttributes::Author(data)) => Some(data.name),
-                _ => None,
-            })
-            .collect();
-        Ok(())
-    }
-
-    pub async fn get_chapters(&mut self, translated_language: Language) -> Result<()> {
-        const MAX_LIMIT: u32 = 500; // This is the max that mangadex allows
-        let mut offset = 0;
-        let mut chapters = Vec::<Chapter>::new();
-        loop {
-            let chapter_data = self
-                .client
-                .manga()
-                .feed()
-                .manga_id(&self.id)
-                .add_translated_language(translated_language)
-                .offset(offset)
-                .limit(MAX_LIMIT)
-                .order(MangaFeedSortOrder::Chapter(OrderDirection::Ascending))
-                .build()?
-                .send()
-                .await??;
-
-            // Update the length of the bar with the number of times we need to paginate
-            // pb.set_length((chapter_data.total / chapter_data.limit) as u64 + 1);
-
-            for chapter in chapter_data.data {
-                chapters.push(chapter.try_into()?);
-            }
-
-            if chapter_data.limit + chapter_data.offset > chapter_data.total {
-                break;
-            }
-
-            // Update the offset and paginate
-            offset += MAX_LIMIT;
-        }
-
-        // TODO Make chapters unique over chapter and sub_chapter
-        // Chapters should be sorted because we called the api with an order we
-        // can use this fact to remove duplicate chapters (from different scan
-        // groups) because they *should* be consecutive.
-        // This should allow us to use a cheaper local vector unique
-        // chapters.dedup();
-
-        // pb.finish_with_message(format!("Grabbed {} chapters.", chapters.len()));
-        self.chapters = chapters;
-        Ok(())
-    }
-
-    pub fn volumes(&mut self, volumes: &impl RangeBounds<u32>) -> &mut Self {
-        self.chapters.retain(|chapter| {
-            if let Some(volume) = chapter.volume {
-                volumes.contains(&volume)
-            } else {
-                false
-            }
-        });
-        self
-    }
-    pub fn chapters(&mut self, chapters: &impl RangeBounds<u32>) {
-        self.chapters
-            .retain(|chapter| chapters.contains(&chapter.chapter));
-    }
-
-    pub async fn download(&mut self) -> Result<()> {
+    pub async fn download(&self) -> Result<()> {
         println!("START DOWNLOAD!");
+        let mp = MultiProgress::new();
+        let style = ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )?;
+        let vol_bar = mp.add(
+            ProgressBar::new(self.volumes.len().try_into()?)
+                .with_message("Downloading Volumes")
+                .with_style(style),
+        );
+        for volume in self.volumes.iter() {
+            vol_bar.set_message(format!("Vol. {:?}", volume.volume));
+            vol_bar.inc(1);
+            volume.download(&mp, &self.client).await?;
+        }
+        vol_bar.finish_with_message("Downloaded Volumes");
+
         Ok(())
-        // todo!()
     }
 }
