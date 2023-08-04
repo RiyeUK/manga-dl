@@ -1,6 +1,6 @@
 use anyhow::{bail, Context};
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Clone)]
 pub(crate) struct IntRange {
     start: Option<u32>,
     end: Option<u32>,
@@ -46,6 +46,31 @@ impl IntRange {
     }
 }
 
+impl std::fmt::Debug for IntRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}..{:?}{}",
+            if let Some(start) = self.start {
+                start.to_string()
+            } else {
+                "".to_string()
+            },
+            if self.end_inclusive {
+                "=".to_string()
+            } else {
+                "".to_string()
+            },
+            if let Some(end) = self.start {
+                end.to_string()
+            } else {
+                "".to_string()
+            },
+        )?;
+        Ok(())
+    }
+}
+
 impl std::str::FromStr for IntRange {
     type Err = anyhow::Error;
 
@@ -61,8 +86,6 @@ impl std::str::FromStr for IntRange {
             }
             None => bail!("Invalid range syntax"),
         };
-
-        if parts.clone().count() == 1 {}
 
         let end_and_inclusive = match parts.next() {
             Some(end_str) => {
@@ -80,6 +103,7 @@ impl std::str::FromStr for IntRange {
                 })
             }
         };
+
         let end = match end_and_inclusive.0 {
             "" => None,
             _ => Some(
@@ -90,12 +114,10 @@ impl std::str::FromStr for IntRange {
             ),
         };
 
-        let end_inclusive = end_and_inclusive.1;
-
         Ok(IntRange {
             start,
             end,
-            end_inclusive,
+            end_inclusive: end_and_inclusive.1,
         })
     }
 }
@@ -181,19 +203,19 @@ mod tests {
             "Invalid start value"
         );
     }
-    // #[test]
-    // fn dont_allow_minus_numbers() {
-    //     assert_eq!(
-    //         IntRange::from_str("-10..-10").err().unwrap().to_string(),
-    //         "Minus values are not allowed"
-    //     );
-    //     assert_eq!(
-    //         IntRange::from_str("-10..10").err().unwrap().to_string(),
-    //         "Minus values are not allowed"
-    //     );
-    //     assert_eq!(
-    //         IntRange::from_str("10..-10").err().unwrap().to_string(),
-    //         "Minus values are not allowed"
-    //     );
-    // }
+    #[test]
+    fn dont_allow_minus_numbers() {
+        assert_eq!(
+            IntRange::from_str("-10..-10").err().unwrap().to_string(),
+            "Invalid start value"
+        );
+        assert_eq!(
+            IntRange::from_str("-10..10").err().unwrap().to_string(),
+            "Invalid start value"
+        );
+        assert_eq!(
+            IntRange::from_str("10..-10").err().unwrap().to_string(),
+            "Invalid end value"
+        );
+    }
 }
