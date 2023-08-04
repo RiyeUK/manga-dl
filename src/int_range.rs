@@ -3,7 +3,7 @@ use std::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToIncl
 use anyhow::{bail, Context};
 
 #[derive(PartialEq, Clone)]
-pub(crate) struct IntRange {
+pub struct IntRange {
     start: Option<u32>,
     end: Option<u32>,
     end_inclusive: bool,
@@ -12,14 +12,14 @@ pub(crate) struct IntRange {
 #[allow(dead_code)]
 impl IntRange {
     /// Checks to see if the given value is within the given range and returns true if it is.
-    fn contains(&self, value: u32) -> bool {
+    pub fn contains(&self, value: &u32) -> bool {
         match (self.start, self.end, self.end_inclusive) {
             (None, None, _) => true,
-            (None, Some(end), true) => value <= end,
-            (None, Some(end), false) => value < end,
-            (Some(start), None, _) => value >= start,
-            (Some(start), Some(end), true) => value >= start && value <= end,
-            (Some(start), Some(end), false) => value >= start && value < end,
+            (None, Some(end), true) => value <= &end,
+            (None, Some(end), false) => value < &end,
+            (Some(start), None, _) => value >= &start,
+            (Some(start), Some(end), true) => value >= &start && value <= &end,
+            (Some(start), Some(end), false) => value >= &start && value < &end,
         }
     }
 
@@ -63,7 +63,7 @@ impl std::fmt::Debug for IntRange {
             } else {
                 "".to_string()
             },
-            if let Some(end) = self.start {
+            if let Some(end) = self.end {
                 end.to_string()
             } else {
                 "".to_string()
@@ -229,33 +229,33 @@ mod tests {
 
     #[test]
     fn contains_range_too_low() {
-        assert_eq!(IntRange::new_range(5, 10).contains(4), false);
+        assert_eq!(IntRange::new_range(5, 10).contains(&4), false);
     }
 
     #[test]
     fn contains_range_too_high() {
-        assert_eq!(IntRange::new_range(5, 10).contains(11), false);
+        assert_eq!(IntRange::new_range(5, 10).contains(&11), false);
     }
 
     #[test]
     fn contains_range_start_inclusive() {
-        assert_eq!(IntRange::new_range(5, 10).contains(5), true);
-        assert_eq!(IntRange::new(Some(5), None, false).contains(5), true);
+        assert_eq!(IntRange::new_range(5, 10).contains(&5), true);
+        assert_eq!(IntRange::new(Some(5), None, false).contains(&5), true);
     }
 
     #[test]
     fn contains_range_end_inclusive() {
-        assert_eq!(IntRange::new_inclusive_range(5, 10).contains(10), true);
-        assert_eq!(IntRange::new_range(5, 10).contains(10), false);
-        assert_eq!(IntRange::new(None, Some(10), true).contains(10), true);
-        assert_eq!(IntRange::new(None, Some(10), false).contains(10), false);
+        assert_eq!(IntRange::new_inclusive_range(5, 10).contains(&10), true);
+        assert_eq!(IntRange::new_range(5, 10).contains(&10), false);
+        assert_eq!(IntRange::new(None, Some(10), true).contains(&10), true);
+        assert_eq!(IntRange::new(None, Some(10), false).contains(&10), false);
     }
 
     #[test]
     fn valid_range() {
-        assert_eq!(IntRange::new_range(5, 10).contains(6), true);
-        assert_eq!(IntRange::new(None, Some(10), false).contains(1), true);
-        assert_eq!(IntRange::new(None, Some(10), true).contains(6), true);
+        assert_eq!(IntRange::new_range(5, 10).contains(&6), true);
+        assert_eq!(IntRange::new(None, Some(10), false).contains(&1), true);
+        assert_eq!(IntRange::new(None, Some(10), true).contains(&6), true);
     }
 
     #[test]

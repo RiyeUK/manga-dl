@@ -12,6 +12,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0.71"
+clap = { version = "4.3.19", features = ["derive"] }
 console = { version = "0.15.7", features = ["windows-console-colors"] }
 derive_builder = "0.12.0"
 futures = "0.3.28"
