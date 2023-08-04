@@ -1,53 +1,53 @@
 use super::{chapter::Chapter, cover::Cover, mangadata::MangaData, volume::Volume, Manga};
+use crate::int_range::IntRange;
 use anyhow::{Context, Result};
-use derive_builder::Builder;
+use clap::Parser;
 use mangadex_api::MangaDexClient;
 use mangadex_api_types_rust::{
     Language, MangaFeedSortOrder, OrderDirection, ReferenceExpansionResource,
 };
-use std::{collections::HashMap, ops::RangeBounds, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 use uuid::Uuid;
 
-#[derive(Builder, Debug)]
-#[builder(public)]
-#[builder(setter(into, strip_option))]
-pub struct GetManga<R>
-where
-    R: RangeBounds<u32>,
-{
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct GetManga {
     /// Anilist ID use in conjunction with title
-    #[builder(default = "None")]
+    #[arg(long)]
     pub anilist_id: Option<u32>,
 
-    #[builder(setter(custom), default = "None")]
-    pub chapters: Option<R>,
+    /// Range of chapters to download
+    #[arg(short, long)]
+    pub chapters: Option<IntRange>,
+
+    /// Range of volumes to download
+    #[arg(short, long)]
+    pub volumes: Option<IntRange>,
 
     /// The language for the covers defaults, if not set we do not download covers
-    #[builder(default = "None")]
+    #[arg(long)]
     pub cover_langauge: Option<Language>,
 
-    #[builder(default = "None")]
+    /// The UUID of the mangadex manga
+    #[arg(short, long)]
     pub id: Option<Uuid>,
 
-    /// Required
     // The base file path of where the files should be saved
     pub output: PathBuf,
 
-    #[builder(default = "None")]
+    /// The title of the manga, required if id is not supplied
+    #[arg(short, long)]
     pub title: Option<String>,
 
-    /// Required
     /// The language we get the manga translated into
+    #[arg(long, default_value = "en")]
     pub translated_language: Language,
 
-    #[builder(setter(custom), default = "None")]
-    pub volumes: Option<R>,
+    #[arg(long)]
+    pub download_covers: bool,
 }
 
-impl<R: Default> Default for GetManga<R>
-where
-    R: RangeBounds<u32>,
-{
+impl Default for GetManga {
     fn default() -> Self {
         Self {
             anilist_id: None,
@@ -58,29 +58,12 @@ where
             title: None,
             translated_language: Language::English,
             volumes: None,
+            download_covers: false,
         }
     }
 }
 
-#[allow(dead_code)]
-impl<R: RangeBounds<u32>> GetMangaBuilder<R> {
-    /// Sets the range of volumes we wish to download. Is overwritten by chapters.
-    pub fn volumes(&mut self, value: R) -> &mut Self {
-        self.volumes = Some(Some(value));
-        self
-    }
-
-    /// Sets the range of chapters we wish to download. Overwrites volumes.
-    pub fn chapters(&mut self, value: R) -> &mut Self {
-        self.chapters = Some(Some(value));
-        self
-    }
-}
-
-impl<R> GetManga<R>
-where
-    R: RangeBounds<u32>,
-{
+impl GetManga {
     pub async fn get(&self) -> Result<Manga> {
         let client = MangaDexClient::default();
 
@@ -283,8 +266,13 @@ where
                 // Check to see we should save this chapter
                 // or exit early
                 if match (&self.chapters, &self.volumes) {
-                    // Chapter ranges takes precendence over volumes
-                    (Some(ch_range), _) => ch_range.contains(&chapter.chapter),
+                    (Some(ch_range), None) => ch_range.contains(&chapter.chapter),
+                    (Some(ch_range), Some(vol_range)) => {
+                        chapter
+                            .volume
+                            .map_or(false, |volume| vol_range.contains(&volume))
+                            && ch_range.contains(&chapter.chapter)
+                    }
                     (None, Some(vol_range)) => chapter
                         .volume
                         .map_or(false, |volume| vol_range.contains(&volume)),
@@ -300,6 +288,7 @@ where
                         .or_insert(vec![])
                         .push(chapter);
                 } else {
+                    // Don't exit early as ranges can be skipped
                     continue;
                 }
             }
@@ -336,6 +325,8 @@ where
                 ))),
             })
             .collect();
+
+        // Downloading in order makes sense
         volumes_list.sort_by_key(|v| v.volume);
         Ok(volumes_list)
     }
