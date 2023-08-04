@@ -1,3 +1,5 @@
+use std::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
+
 use anyhow::{bail, Context};
 
 #[derive(PartialEq, Clone)]
@@ -50,7 +52,7 @@ impl std::fmt::Debug for IntRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}..{:?}{}",
+            "{}..{}{}",
             if let Some(start) = self.start {
                 start.to_string()
             } else {
@@ -119,6 +121,71 @@ impl std::str::FromStr for IntRange {
             end,
             end_inclusive: end_and_inclusive.1,
         })
+    }
+}
+
+impl Default for IntRange {
+    fn default() -> Self {
+        Self {
+            start: None,
+            end: None,
+            end_inclusive: false,
+        }
+    }
+}
+
+impl From<RangeInclusive<u32>> for IntRange {
+    fn from(value: RangeInclusive<u32>) -> Self {
+        Self {
+            start: Some(value.start().to_owned()),
+            end: Some(value.end().to_owned()),
+            end_inclusive: true,
+        }
+    }
+}
+
+impl From<Range<u32>> for IntRange {
+    fn from(value: Range<u32>) -> Self {
+        Self {
+            start: Some(value.start),
+            end: Some(value.end),
+            end_inclusive: false,
+        }
+    }
+}
+
+impl From<RangeTo<u32>> for IntRange {
+    fn from(value: RangeTo<u32>) -> Self {
+        Self {
+            start: None,
+            end: Some(value.end),
+            end_inclusive: false,
+        }
+    }
+}
+impl From<RangeFrom<u32>> for IntRange {
+    fn from(value: RangeFrom<u32>) -> Self {
+        Self {
+            start: Some(value.start),
+            end: None,
+            end_inclusive: false,
+        }
+    }
+}
+
+impl From<RangeToInclusive<u32>> for IntRange {
+    fn from(value: RangeToInclusive<u32>) -> Self {
+        Self {
+            start: None,
+            end: Some(value.end),
+            end_inclusive: true,
+        }
+    }
+}
+
+impl From<RangeFull> for IntRange {
+    fn from(_value: RangeFull) -> Self {
+        Self::default()
     }
 }
 
@@ -203,6 +270,20 @@ mod tests {
             "Invalid start value"
         );
     }
+
+    #[test]
+    fn invalid_end() {
+        assert_eq!(
+            IntRange::from_str("..&10").err().unwrap().to_string(),
+            "Invalid end value"
+        );
+
+        assert_eq!(
+            IntRange::from_str("..a").err().unwrap().to_string(),
+            "Invalid end value"
+        );
+    }
+
     #[test]
     fn dont_allow_minus_numbers() {
         assert_eq!(
@@ -217,5 +298,26 @@ mod tests {
             IntRange::from_str("10..-10").err().unwrap().to_string(),
             "Invalid end value"
         );
+    }
+
+    #[test]
+    fn conversion_from_ranges() {
+        assert_eq!(
+            Into::<IntRange>::into(..5),
+            IntRange::new(None, Some(5), false)
+        );
+        assert_eq!(
+            Into::<IntRange>::into(5..),
+            IntRange::new(Some(5), None, false)
+        );
+        assert_eq!(
+            Into::<IntRange>::into(5..=10),
+            IntRange::new(Some(5), Some(10), true)
+        );
+        assert_eq!(
+            Into::<IntRange>::into(..=5),
+            IntRange::new(None, Some(5), true)
+        );
+        assert_eq!(Into::<IntRange>::into(..), IntRange::new(None, None, false));
     }
 }
