@@ -1,6 +1,6 @@
 use super::{chapter::Chapter, cover::Cover, mangadata::MangaData, volume::Volume, Manga};
 use crate::int_range::IntRange;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use mangadex_api::MangaDexClient;
 use mangadex_api_types_rust::{
@@ -26,7 +26,7 @@ pub struct GetManga {
 
     /// The language for the covers defaults, if not set we do not download covers
     #[arg(long)]
-    pub cover_langauge: Option<Language>,
+    pub cover_language: Option<Language>,
 
     /// The UUID of the mangadex manga
     #[arg(short, long)]
@@ -52,7 +52,7 @@ impl Default for GetManga {
         Self {
             anilist_id: None,
             chapters: None,
-            cover_langauge: None,
+            cover_language: None,
             id: None,
             output: PathBuf::default(),
             title: None,
@@ -64,6 +64,15 @@ impl Default for GetManga {
 }
 
 impl GetManga {
+    /// Uses either the ID provided or searches mangadex for the
+    /// provided manga. It gets meta data used to save in the
+    /// correct files.
+    /// If an ID is not provided a title is required, if we also have a
+    /// anilist_id value we used this to validate our search result.
+    /// If we don't have an anilist id we just take the first result
+    /// returned when we search mangadex. We don't do any huristics
+    /// on our side. So it is advised to use search in conjunction
+    /// with an anilist_id value.
     pub async fn get(&self) -> Result<Manga> {
         let client = MangaDexClient::default();
 
@@ -97,38 +106,42 @@ impl GetManga {
     async fn search(&self, client: &MangaDexClient) -> Result<Uuid> {
         println!("Searching for Manga ID...");
 
-        let search_data = client
-            .search()
-            .manga()
-            .title(
-                &*self
-                    .title
-                    .clone()
-                    .context("Attempted to search without a title!")?,
-            )
-            .available_translated_language(vec![self.translated_language])
-            .build()?
-            .send()
-            .await?;
+        if let Some(title) = self.title.clone() {
+            let search_data = client
+                .search()
+                .manga()
+                .title(&*title)
+                .available_translated_language(vec![self.translated_language])
+                .build()?
+                .send()
+                .await?;
 
-        if let Some(anilist) = self.anilist_id {
-            let id = search_data.data.iter().find_map(|manga| {
-                if manga
-                    .attributes
-                    .links
-                    .as_ref()
-                    .map(|links| links.anilist.as_ref())
-                    == Some(Some(&anilist.to_string()))
-                {
-                    Some(manga.id)
-                } else {
-                    None
-                }
-            });
-            println!("Found Manga ID of {}", id.unwrap().to_string());
-            id.with_context(|| format!("No Manga Found with anilist id {:?}", anilist))
+            if search_data.total < 1 {
+                bail!("Found no manga with a title of {}", title);
+            }
+
+            if let Some(anilist) = self.anilist_id {
+                let id = search_data.data.iter().find_map(|manga| {
+                    dbg!(manga);
+                    if manga
+                        .attributes
+                        .links
+                        .as_ref()
+                        .map(|links| links.anilist.as_ref())
+                        == Some(Some(&anilist.to_string()))
+                    {
+                        Some(manga.id)
+                    } else {
+                        None
+                    }
+                });
+                println!("Found Manga ID of {}", id.unwrap().to_string());
+                id.with_context(|| format!("No Manga Found with anilist id {:?}", anilist))
+            } else {
+                Ok(search_data.data.first().unwrap().id)
+            }
         } else {
-            Ok(search_data.data.first().unwrap().id)
+            bail!("Missing title!");
         }
     }
 
@@ -150,10 +163,7 @@ impl GetManga {
                 .limit(COVER_LIMIT)
                 .offset(offset)
                 .manga_ids(vec![id.clone()])
-                .locale(
-                    self.cover_langauge
-                        .context("Called fetch_covers without a cover language set!")?,
-                )
+                .locale(self.cover_language.unwrap_or(Language::Japanese))
                 .build()?
                 .send()
                 .await?;
@@ -307,7 +317,7 @@ impl GetManga {
             volumes.keys().len()
         );
 
-        let covers: HashMap<Option<u32>, Vec<Cover>> = if self.cover_langauge.is_some() {
+        let covers: HashMap<Option<u32>, Vec<Cover>> = if self.download_covers {
             self.fetch_covers(&client, &id, &path).await?
         } else {
             HashMap::new()
