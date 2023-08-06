@@ -45,22 +45,9 @@ pub struct GetManga {
 
     #[arg(long)]
     pub download_covers: bool,
-}
 
-impl Default for GetManga {
-    fn default() -> Self {
-        Self {
-            anilist_id: None,
-            chapters: None,
-            cover_language: None,
-            id: None,
-            output: PathBuf::default(),
-            title: None,
-            translated_language: Language::English,
-            volumes: None,
-            download_covers: false,
-        }
-    }
+    #[arg(long)]
+    pub verbose: bool,
 }
 
 impl GetManga {
