@@ -97,11 +97,12 @@ impl std::str::FromStr for IntRange {
                     (end_str, false)
                 }
             }
+            // Unit
             None => {
                 return Ok(Self {
                     start,
                     end: start,
-                    end_inclusive: false,
+                    end_inclusive: true,
                 })
             }
         };
@@ -223,7 +224,11 @@ mod tests {
 
     #[test]
     fn parse_valid_unit() -> anyhow::Result<()> {
-        assert_eq!(IntRange::from_str("10")?, IntRange::new_range(10, 10));
+        assert_eq!(
+            IntRange::from_str("10")?,
+            IntRange::new(Some(10), Some(10), true)
+        );
+        assert_eq!(IntRange::from_str("10")?.contains(&10), true);
         Ok(())
     }
 
