@@ -1,6 +1,12 @@
 # manga-dl (Working Title)
 
-This WIP Rust project downloads manga from mangadex in full quality. In a folder structure that is ready to be converted into epub format for reading using e-readers.
+This WIP Rust project downloads manga from mangadex in full quality. In a folder structure that is ready to be converted
+into epub format for reading using e-readers.
+
+# Disclaimer
+
+Robust rate-limiting has not been handled. This means although some effort has been put into not overloading mangadex's
+servers that it is possible to be temporarlly IP banned from Mangadex if using this to download large mangas.
 
 # Usage
 
@@ -70,6 +76,10 @@ manga-dl -t "My Manga" --anilist-id 123456 --volumes 1..=5 /path/to/save/{title}
 ```
 manga-dl -t "My Manga" --chapters ..10 --download-covers /path/to/save/{title}/
 ```
+
+# Acknowledgments
+
+The manga-dl program uses the MangaDex API to fetch manga data. Many thanks to the MangaDex team for providing this API.
 
 ## Proposed features
 
