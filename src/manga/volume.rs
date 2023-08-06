@@ -58,12 +58,15 @@ impl Volume {
 
         chapter_bar.inc(0);
         for chapter in self.chapters.iter() {
-            chapter.download_stream(client).await.with_context(|| {
-                format!(
-                    "Attempting to download chapter {} {:?}, with an ID of {}",
-                    chapter.chapter, chapter.sub_chapter, chapter.id
-                )
-            })?;
+            chapter
+                .download_stream(client, multi_bar)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Attempting to download chapter {} {:?}, with an ID of {}",
+                        chapter.chapter, chapter.sub_chapter, chapter.id
+                    )
+                })?;
             chapter_bar.inc(1);
         }
 

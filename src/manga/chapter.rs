@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use futures::{stream, StreamExt};
-use indicatif::MultiProgress;
-// use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api::{
     utils::download::{chapter::DownloadMode, DownloadElement},
     MangaDexClient,
@@ -92,7 +91,7 @@ impl Chapter {
     }
 
     #[allow(dead_code)]
-    pub async fn download(&self, client: &MangaDexClient, multi_bar: &MultiProgress) -> Result<()> {
+    pub async fn download(&self, client: &MangaDexClient) -> Result<()> {
         // let style = ProgressStyle::with_template(
         //     "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
         // )?;
@@ -162,7 +161,16 @@ impl Chapter {
     pub async fn download_stream(
         &self,
         client: &MangaDexClient,
+        multi_bar: &MultiProgress,
     ) -> Result<Vec<anyhow::Result<()>>> {
+        let style = ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )?;
+        let page_bar = multi_bar.add(
+            ProgressBar::new(1)
+                .with_message("Downloading Pages")
+                .with_style(style.clone()),
+        );
         let file_names = client
             .download()
             .chapter(self.id)
@@ -173,16 +181,22 @@ impl Chapter {
             .await?;
 
         let len = file_names.len();
-        let results = stream::iter(file_names)
+        page_bar.set_length(len.try_into()?);
+        let mut stream = stream::iter(file_names)
             .enumerate()
             .map(|(index, filename)| async move {
                 let data = filename.download().await?;
                 Chapter::save_page(data, index + 1, len as f64, self.path.clone().unwrap()).await?;
                 Ok(())
             })
-            .buffer_unordered(5)
-            .collect::<Vec<_>>()
-            .await;
+            .buffer_unordered(5);
+        let mut results = Vec::new();
+
+        while let Some(page) = stream.next().await {
+            results.push(page);
+            page_bar.inc(1);
+        }
+        page_bar.finish_and_clear();
 
         Ok(results)
     }
