@@ -4,7 +4,7 @@ use mangadex_api_schema_rust::{
 };
 
 /// Required Manga metadata
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MangaData {
     pub alt_titles: Vec<LocalizedString>,
     pub authors: Vec<String>,
@@ -12,6 +12,7 @@ pub struct MangaData {
 }
 
 impl MangaData {
+    #[allow(dead_code)]
     pub fn new(
         alt_titles: Vec<LocalizedString>,
         authors: Vec<String>,
@@ -21,16 +22,6 @@ impl MangaData {
             alt_titles,
             authors,
             title,
-        }
-    }
-}
-
-impl Default for MangaData {
-    fn default() -> Self {
-        MangaData {
-            title: LocalizedString::default(),
-            alt_titles: Vec::new(),
-            authors: Vec::new(),
         }
     }
 }

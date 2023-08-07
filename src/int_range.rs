@@ -2,7 +2,7 @@ use std::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToIncl
 
 use anyhow::{bail, Context};
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Default)]
 pub struct IntRange {
     start: Option<u32>,
     end: Option<u32>,
@@ -122,16 +122,6 @@ impl std::str::FromStr for IntRange {
             end,
             end_inclusive: end_and_inclusive.1,
         })
-    }
-}
-
-impl Default for IntRange {
-    fn default() -> Self {
-        Self {
-            start: None,
-            end: None,
-            end_inclusive: false,
-        }
     }
 }
 
