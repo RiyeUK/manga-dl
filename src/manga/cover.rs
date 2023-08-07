@@ -74,15 +74,13 @@ impl<T> TryFrom<ApiObject<CoverAttributes, T>> for Cover {
                 .ok()
         });
 
-        let sub_volume = volume_n
-            .map(|volume| {
-                if volume.fract() > 0.0 {
-                    Some((volume.fract() * 10.0) as u32)
-                } else {
-                    None
-                }
-            })
-            .flatten();
+        let sub_volume = volume_n.and_then(|volume| {
+            if volume.fract() > 0.0 {
+                Some((volume.fract() * 10.0) as u32)
+            } else {
+                None
+            }
+        });
 
         Ok(Cover {
             id: value.id,

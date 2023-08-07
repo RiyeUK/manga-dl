@@ -1,5 +1,4 @@
 use super::{chapter::Chapter, cover::Cover};
-#[allow(unused_imports)]
 use anyhow::{Context, Result};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api::MangaDexClient;
@@ -39,7 +38,7 @@ impl Volume {
                 .with_style(style.clone()),
         );
 
-        if self.covers.len() > 0 {
+        if !self.covers.is_empty() {
             cover_bar.inc(0);
             for (index, cover) in self.covers.iter().enumerate() {
                 cover.download(index, client).await?;

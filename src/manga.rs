@@ -1,6 +1,4 @@
-#[allow(unused_imports)]
-use anyhow::{Context, Result};
-#[allow(unused_imports)]
+use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api::MangaDexClient;
 use std::path::PathBuf;
