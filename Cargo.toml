@@ -13,15 +13,10 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.3.19", features = ["derive"] }
-console = { version = "0.15.7", features = ["windows-console-colors"] }
-derive_builder = "0.12.0"
 futures = "0.3.28"
-futures-util = "0.3.28"
 indicatif = "0.17.5"
-itertools = "0.11.0"
 mangadex-api = { version = "2.2.1", features = ["multi-thread"] }
 mangadex-api-schema-rust = "0.3.2"
 mangadex-api-types-rust = "0.3.4"
 tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread", "time"] }
-tokio-stream = "0.1.14"
 uuid = "1.4.0"
