@@ -6,7 +6,10 @@ use mangadex_api::MangaDexClient;
 use mangadex_api_types_rust::{
     Language, MangaFeedSortOrder, OrderDirection, ReferenceExpansionResource,
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -122,7 +125,7 @@ impl GetManga {
                         None
                     }
                 });
-                println!("Found Manga ID of {}", id.unwrap().to_string());
+                println!("Found Manga ID of {}", id.unwrap());
                 id.with_context(|| format!("No Manga Found with anilist id {:?}", anilist))
             } else {
                 Ok(search_data.data.first().unwrap().id)
@@ -136,7 +139,7 @@ impl GetManga {
         &self,
         client: &MangaDexClient,
         id: &Uuid,
-        path: &PathBuf,
+        path: &Path,
     ) -> Result<HashMap<Option<u32>, Vec<Cover>>> {
         println!("Fetching Covers...");
 
@@ -149,7 +152,7 @@ impl GetManga {
                 .list()
                 .limit(COVER_LIMIT)
                 .offset(offset)
-                .manga_ids(vec![id.clone()])
+                .manga_ids(vec![*id])
                 .locale(self.cover_language.unwrap_or(Language::Japanese))
                 .build()?
                 .send()
@@ -172,7 +175,7 @@ impl GetManga {
         }
 
         for cover in &mut covers {
-            cover.path = Some(path.clone().join(format!(
+            cover.path = Some(path.to_path_buf().join(format!(
                 "Vol. {}",
                 cover
                     .volume
@@ -213,7 +216,7 @@ impl GetManga {
         &self,
         client: &MangaDexClient,
         id: &Uuid,
-        path: &PathBuf,
+        path: &Path,
     ) -> Result<Vec<Volume>> {
         const CHAPTER_LIMIT: u32 = 500; // Max that the mangadex api allows
         let mut offset = 0;
@@ -234,12 +237,12 @@ impl GetManga {
 
             for chapter in chapters_data.data {
                 let mut chapter: Chapter = chapter.try_into()?;
-                if chapter.pages <= 0 {
+                if chapter.pages == 0 {
                     // TODO: Add logic to detect dulicates
                     continue;
                 }
 
-                let mut ch_path = path.clone();
+                let mut ch_path = path.to_path_buf();
                 ch_path.push(format!(
                     "Vol. {}",
                     chapter
@@ -305,7 +308,7 @@ impl GetManga {
         );
 
         let covers: HashMap<Option<u32>, Vec<Cover>> = if self.download_covers {
-            self.fetch_covers(&client, &id, &path).await?
+            self.fetch_covers(client, id, path).await?
         } else {
             HashMap::new()
         };
@@ -316,7 +319,7 @@ impl GetManga {
                 covers: covers.get(&volume).cloned().unwrap_or(Vec::new()),
                 chapters,
                 volume,
-                path: Some(path.clone().join(format!(
+                path: Some(path.to_path_buf().join(format!(
                     "Vol. {}",
                     volume.map_or("None".to_string(), |num| format!("{:?}", num))
                 ))),
