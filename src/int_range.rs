@@ -218,39 +218,39 @@ mod tests {
             IntRange::from_str("10")?,
             IntRange::new(Some(10), Some(10), true)
         );
-        assert_eq!(IntRange::from_str("10")?.contains(&10), true);
+        assert!(IntRange::from_str("10")?.contains(&10));
         Ok(())
     }
 
     #[test]
     fn contains_range_too_low() {
-        assert_eq!(IntRange::new_range(5, 10).contains(&4), false);
+        assert!(!IntRange::new_range(5, 10).contains(&4));
     }
 
     #[test]
     fn contains_range_too_high() {
-        assert_eq!(IntRange::new_range(5, 10).contains(&11), false);
+        assert!(!IntRange::new_range(5, 10).contains(&11));
     }
 
     #[test]
     fn contains_range_start_inclusive() {
-        assert_eq!(IntRange::new_range(5, 10).contains(&5), true);
-        assert_eq!(IntRange::new(Some(5), None, false).contains(&5), true);
+        assert!(IntRange::new_range(5, 10).contains(&5));
+        assert!(IntRange::new(Some(5), None, false).contains(&5));
     }
 
     #[test]
     fn contains_range_end_inclusive() {
-        assert_eq!(IntRange::new_inclusive_range(5, 10).contains(&10), true);
-        assert_eq!(IntRange::new_range(5, 10).contains(&10), false);
-        assert_eq!(IntRange::new(None, Some(10), true).contains(&10), true);
-        assert_eq!(IntRange::new(None, Some(10), false).contains(&10), false);
+        assert!(IntRange::new_inclusive_range(5, 10).contains(&10));
+        assert!(!IntRange::new_range(5, 10).contains(&10));
+        assert!(IntRange::new(None, Some(10), true).contains(&10));
+        assert!(!IntRange::new(None, Some(10), false).contains(&10));
     }
 
     #[test]
     fn valid_range() {
-        assert_eq!(IntRange::new_range(5, 10).contains(&6), true);
-        assert_eq!(IntRange::new(None, Some(10), false).contains(&1), true);
-        assert_eq!(IntRange::new(None, Some(10), true).contains(&6), true);
+        assert!(IntRange::new_range(5, 10).contains(&6));
+        assert!(IntRange::new(None, Some(10), false).contains(&1));
+        assert!(IntRange::new(None, Some(10), true).contains(&6));
     }
 
     #[test]
