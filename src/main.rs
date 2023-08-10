@@ -41,6 +41,7 @@
 use anyhow::Result;
 use clap::Parser;
 
+mod anilist;
 mod int_range;
 mod manga;
 use manga::get::GetManga;

@@ -1,4 +1,5 @@
 use super::{chapter::Chapter, cover::Cover, mangadata::MangaData, volume::Volume, Manga};
+use crate::anilist::{self, api};
 use crate::int_range::IntRange;
 use anyhow::{bail, Context, Result};
 use clap::Parser;
@@ -38,7 +39,7 @@ pub struct GetManga {
     // The base file path of where the files should be saved
     pub output: PathBuf,
 
-    /// The title of the manga, required if id is not supplied
+    /// The title of the manga we search for. We always grab the first result.
     #[arg(short, long)]
     pub title: Option<String>,
 
@@ -94,44 +95,45 @@ impl GetManga {
     /// Search for the Mangadex UUID by searching and then checking against the
     /// AnilistID if present.
     async fn search(&self, client: &MangaDexClient) -> Result<Uuid> {
+        let mut title = self.title.clone().unwrap_or_else(|| "".into());
+        if let Some(anilist) = self.anilist_id {
+            println!("Searching Anilist.co for name...");
+            title = anilist::api::get_anilist_name(anilist).await?;
+        }
         println!("Searching for Manga ID...");
 
-        if let Some(title) = self.title.clone() {
-            let search_data = client
-                .search()
-                .manga()
-                .title(&*title)
-                .available_translated_language(vec![self.translated_language])
-                .build()?
-                .send()
-                .await?;
+        let search_data = client
+            .search()
+            .manga()
+            .title(&*title)
+            .available_translated_language(vec![self.translated_language])
+            .build()?
+            .send()
+            .await?;
 
-            if search_data.total < 1 {
-                bail!("Found no manga with a title of {}", title);
-            }
+        if search_data.total < 1 {
+            bail!("Found no manga with a title of {}", title);
+        }
 
-            if let Some(anilist) = self.anilist_id {
-                let id = search_data.data.iter().find_map(|manga| {
-                    dbg!(manga);
-                    if manga
-                        .attributes
-                        .links
-                        .as_ref()
-                        .map(|links| links.anilist.as_ref())
-                        == Some(Some(&anilist.to_string()))
-                    {
-                        Some(manga.id)
-                    } else {
-                        None
-                    }
-                });
-                println!("Found Manga ID of {}", id.unwrap());
-                id.with_context(|| format!("No Manga Found with anilist id {:?}", anilist))
-            } else {
-                Ok(search_data.data.first().unwrap().id)
-            }
+        if let Some(anilist) = self.anilist_id {
+            let id = search_data.data.iter().find_map(|manga| {
+                dbg!(manga);
+                if manga
+                    .attributes
+                    .links
+                    .as_ref()
+                    .map(|links| links.anilist.as_ref())
+                    == Some(Some(&anilist.to_string()))
+                {
+                    Some(manga.id)
+                } else {
+                    None
+                }
+            });
+            println!("Found Manga ID of {}", id.unwrap());
+            id.with_context(|| format!("No Manga Found with anilist id {:?}", anilist))
         } else {
-            bail!("Missing title!");
+            Ok(search_data.data.first().unwrap().id)
         }
     }
 
