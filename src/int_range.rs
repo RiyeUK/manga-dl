@@ -50,24 +50,22 @@ impl IntRange {
 
 impl std::fmt::Debug for IntRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Check for unit type
+        if self
+            .start
+            .is_some_and(|start| self.end.is_some_and(|end| end == start))
+        {
+            write!(f, "{}", self.start.unwrap())?;
+            return Ok(());
+        }
+
         write!(
             f,
             "{}..{}{}",
-            if let Some(start) = self.start {
-                start.to_string()
-            } else {
-                "".to_string()
-            },
-            if self.end_inclusive {
-                "=".to_string()
-            } else {
-                "".to_string()
-            },
-            if let Some(end) = self.end {
-                end.to_string()
-            } else {
-                "".to_string()
-            },
+            self.start
+                .map_or_else(|| "".into(), |start| start.to_string()),
+            if self.end_inclusive { "=" } else { "" },
+            self.end.map_or_else(|| "".into(), |end| end.to_string()),
         )?;
         Ok(())
     }
@@ -314,5 +312,23 @@ mod tests {
             IntRange::new(None, Some(5), true)
         );
         assert_eq!(Into::<IntRange>::into(..), IntRange::new(None, None, false));
+    }
+
+    #[test]
+    fn to_string() {
+        assert_eq!(
+            format!("{:?}", IntRange::new(Some(5), Some(5), true)),
+            "5"
+        );
+
+        assert_eq!(
+            format!("{:?}", IntRange::new(Some(1), Some(5), true)),
+            "1..=5"
+        );
+
+        assert_eq!(
+            format!("{:?}", IntRange::new(Some(1), Some(5), false)),
+            "1..5"
+        );
     }
 }
