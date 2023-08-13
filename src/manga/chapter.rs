@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use futures::{stream, StreamExt};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mangadex_api::{
@@ -100,9 +100,10 @@ impl Chapter {
         //         .with_message("Downloading Pages")
         //         .with_style(style.clone()),
         // );
-        println!("Creating {:?}", self.path);
+        ensure!(self.path.is_some());
+        println!("Creating {}", self.path.as_ref().unwrap().display());
         create_dir_all(self.path.clone().unwrap())?;
-        let file_names = client
+        let filenames = client
             .download()
             .chapter(self.id)
             .mode(DownloadMode::Normal)
@@ -111,14 +112,14 @@ impl Chapter {
             .build_at_home_urls()
             .await?;
 
-        for (index, page) in file_names.iter().enumerate() {
-            let (_filename, data) = page.download().await.with_context(|| {
+        for (index, page) in filenames.iter().enumerate() {
+            let (filename, data) = page.download().await.with_context(|| {
                 format!(
                     "Attempting to download page {} for chapter {}.{:?}",
                     index, self.chapter, self.sub_chapter
                 )
             })?;
-            let filename = PathBuf::from(_filename);
+            let filename = PathBuf::from(filename);
             let mut result = filename.to_owned();
             result.set_file_name(format!(
                 "{:0len$}",
@@ -142,8 +143,8 @@ impl Chapter {
         path: PathBuf,
     ) -> anyhow::Result<()> {
         create_dir_all(path.clone())?;
-        let (_filename, _bytes) = data;
-        let filename = PathBuf::from(_filename);
+        let (filename, bytes) = data;
+        let filename = PathBuf::from(filename);
         let mut result = filename.to_owned();
         result.set_file_name(format!(
             "{:0len$}",
@@ -154,7 +155,7 @@ impl Chapter {
             result.set_extension(ext);
         }
         let mut file = File::create(path.clone().join(result))?;
-        file.write_all(&_bytes.unwrap())?;
+        file.write_all(&bytes.unwrap())?;
         Ok(())
     }
 

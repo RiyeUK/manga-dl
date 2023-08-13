@@ -58,11 +58,11 @@ impl GetManga {
     /// provided manga. It gets meta data used to save in the
     /// correct files.
     /// If an ID is not provided a title is required, if we also have a
-    /// anilist_id value we used this to validate our search result.
+    /// `anilist_id` value we used this to validate our search result.
     /// If we don't have an anilist id we just take the first result
     /// returned when we search mangadex. We don't do any huristics
     /// on our side. So it is advised to use search in conjunction
-    /// with an anilist_id value.
+    /// with an `anilist_id` value.
     pub async fn get(&self) -> Result<Manga> {
         let client = MangaDexClient::default();
 
@@ -92,7 +92,7 @@ impl GetManga {
     }
 
     /// Search for the Mangadex UUID by searching and then checking against the
-    /// AnilistID if present.
+    /// `AnilistID` if present.
     async fn search(&self, client: &MangaDexClient) -> Result<Uuid> {
         println!("Searching for Manga ID...");
 
@@ -112,7 +112,6 @@ impl GetManga {
 
             if let Some(anilist) = self.anilist_id {
                 let id = search_data.data.iter().find_map(|manga| {
-                    dbg!(manga);
                     if manga
                         .attributes
                         .links
